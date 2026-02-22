@@ -38,6 +38,7 @@ Objectif: Réaliser un classificateur élémentaire
 
 L2.E2  - OU exclusif et réseaux de neurones artificiels
 """
+
 # pylint: disable = missing-function-docstring, missing-module-docstring, ungrouped-imports, wrong-import-position
 import os
 import pathlib
@@ -58,19 +59,15 @@ import helpers.viz as viz
 
 def main():
     # XOR dataset
-    data = numpy.array([[0, 0],
-                        [0, 1],
-                        [1, 0],
-                        [1, 1]])
+    data = numpy.array([[0, 0], [0, 1], [1, 0], [1, 1]])
 
-    labels = numpy.array([[0],
-                          [1],
-                          [1],
-                          [0]])
+    labels = numpy.array([[0], [1], [1], [0]])
 
     # Plotting the XOR dataset
     plt.figure(figsize=(4, 4))
-    scatter = plt.scatter(data[:, 0], data[:, 1], c=labels.flatten(), s=200, cmap="bwr", edgecolors="k")
+    scatter = plt.scatter(
+        data[:, 0], data[:, 1], c=labels.flatten(), s=200, cmap="bwr", edgecolors="k"
+    )
     plt.title("XOR Dataset Visualization")
     plt.xlabel("Input 1")
     plt.ylabel("Input 2")
@@ -82,8 +79,8 @@ def main():
     # -------------------------------------------------------------------------
     model = keras.models.Sequential()
     model.add(keras.layers.InputLayer(shape=(2,)))
+    model.add(keras.layers.Dense(units=2, activation="sigmoid"))
     model.add(keras.layers.Dense(units=1, activation="sigmoid"))
-    model.add(keras.layers.Dense(units=1, activation="linear"))
     print(model.summary())
     # -------------------------------------------------------------------------
 
@@ -94,18 +91,19 @@ def main():
     model.compile(
         optimizer=keras.optimizers.SGD(learning_rate=0.5, momentum=0.9),
         loss=keras.losses.MeanSquaredError(),
-        metrics=None
+        metrics=None,
     )
     # -------------------------------------------------------------------------
 
     # Train the model
     history: keras.callbacks.History = model.fit(
-        data, labels,
+        data,
+        labels,
         batch_size=len(data),
         shuffle=True,
         epochs=1000,
         callbacks=None,
-        verbose=True
+        verbose=True,
     )
 
     # Plot metrics
@@ -117,7 +115,9 @@ def main():
     model.save(saves_directory / "xor_model.keras")
 
     # Load the trained model
-    loaded_model: keras.models.Model = keras.models.load_model(saves_directory / "xor_model.keras")
+    loaded_model: keras.models.Model = keras.models.load_model(
+        saves_directory / "xor_model.keras"
+    )
 
     # Evaluate the loaded model
     prediction = loaded_model.predict(data)

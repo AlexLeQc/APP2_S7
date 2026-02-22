@@ -17,33 +17,88 @@ import helpers.dataset as dataset
 import helpers.viz as viz
 
 
-def exercice_1_distributions_statistiques():
-    # L1.E1.1 Visualiser la distribution de points échantillonnés à partir d'une distribution gaussienne
+def prep_1_distributions_statistiques():
+    # L1.P1.1 Visualiser la distribution de points échantillonnés à partir d'une distribution gaussienne
     # -------------------------------------------------------------------------
     mean = [3, -1]
-    covariance = [[1, 0.8], [0.8, 1]]
-    N = 20
+    covariance = [[1, 0], [0, 1]]
+    N = 500
+    N_values = [10, 20, 50, 100, 500]
 
-    samples = numpy.random.multivariate_normal(mean, covariance, N)
+    # mean_samples_list = []
+    # cov_samples_list = []
 
-    mean_samples = numpy.mean(samples, axis=0)
-    print("mean_samples:", mean_samples)
+    sigma_m_list = []
+    sigma_sigma_list = []
 
-    cov_sample = numpy.cov(samples, rowvar=False)
-    print("cov_sample:", cov_sample)
+    for N in N_values:
+        mean_samples_list = []
+        cov_samples_list = []
+        for i in range(10):
+            samples = numpy.random.multivariate_normal(mean, covariance, N)
+            mean_samples = numpy.mean(samples, axis=0)
+            mean_samples_list.append(mean_samples)
+            cov_sample = numpy.cov(samples, rowvar=False)
+            cov_samples_list.append(cov_sample)
 
-    plt.figure(figsize=(8, 6))
-    plt.scatter(
-        samples[:, 0], samples[:, 1], color="blue", label="Points échantillonnés"
-    )
-    plt.axhline(0, color="black", linewidth=0.5)
-    plt.axvline(0, color="black", linewidth=0.5)
-    plt.title(f"Distribution Gaussienne 2D (N={N})")
-    plt.xlabel("Dimension 1")
-    plt.ylabel("Dimension 2")
-    plt.grid(True, linestyle="--", alpha=0.7)
+            # print("mean_samples:", mean_samples)
+            # print("cov_sample:", cov_sample)
+
+        mean_samples_array = numpy.array(mean_samples_list)
+        cov_samples_array = numpy.array(cov_samples_list)
+
+        mm = numpy.mean(mean_samples_array, axis=0)
+        sigma_m = numpy.std(mean_samples_array, axis=0)
+        # print("Moyenne des échantillons de moyennes:", mm)
+        # print("Écart-type des échantillons de moyennes:", sigma_m)
+
+        mSigma = numpy.mean(cov_samples_array, axis=0)
+        sigma_sigma = numpy.std(cov_samples_array, axis=0)
+        # print("Moyenne des échantillons de covariances:", mSigma)
+        # print("Écart-type des échantillons de covariances:", sigma_sigma)
+        sigma_m_list.append(sigma_m)
+        sigma_sigma_list.append(sigma_sigma)
+
+    sigma_m_array = numpy.array(sigma_m_list)
+    sigma_sigma_array = numpy.array(sigma_sigma_list)
+
+    # Tracé des écart-types des moyennes
+    plt.figure(figsize=(10, 4))
+    plt.subplot(1, 2, 1)
+    plt.plot(N_values, sigma_m_array[:, 0], marker="o", label="σm[0]")
+    plt.plot(N_values, sigma_m_array[:, 1], marker="o", label="σm[1]")
+    plt.xlabel("Taille N")
+    plt.ylabel("Écart-type des moyennes (σm)")
+    plt.title("Écart-type des moyennes vs N")
     plt.legend()
+    plt.grid(True)
+
+    # Tracé des écart-types des éléments de la matrice de covariance
+    plt.figure(figsize=(10, 8))
+    labels = ["σΣ[0,0]", "σΣ[0,1]", "σΣ[1,0]", "σΣ[1,1]"]
+    for i in range(2):
+        for j in range(2):
+            plt.subplot(2, 2, i * 2 + j + 1)
+            plt.plot(N_values, sigma_sigma_array[:, i, j], marker="o")
+            plt.xlabel("Taille N")
+            plt.ylabel(f"Écart-type {labels[i * 2 + j]}")
+            plt.title(f"{labels[i * 2 + j]} vs N")
+            plt.grid(True)
+    plt.tight_layout()
     plt.show()
+
+    # plt.figure(figsize=(8, 6))
+    # plt.scatter(
+    #     samples[:, 0], samples[:, 1], color="blue", label="Points échantillonnés"
+    # )
+    # plt.axhline(0, color="black", linewidth=0.5)
+    # plt.axvline(0, color="black", linewidth=0.5)
+    # plt.title(f"Distribution Gaussienne 2D (N={N})")
+    # plt.xlabel("Dimension 1")
+    # plt.ylabel("Dimension 2")
+    # plt.grid(True, linestyle="--", alpha=0.7)
+    # plt.legend()
+    # plt.show()
 
     # -------------------------------------------------------------------------
 
@@ -56,7 +111,7 @@ def exercice_2_decorrelation():
     # -------------------------------------------------------------------------
     # Utilisez la fonction appropriée pour calculer les valeurs propres et vecteurs propres
     # À la place des vecteurs et valeurs propres nulles ci-dessous
-    eigenvalues, eigenvectors = numpy.zeros(3), numpy.zeros((3, 3))
+    eigenvalues, eigenvectors = numpy.linalg.eigh(covariance)
 
     print("Exercice 2.1: Calcul des valeurs propres et vecteurs propres")
     viz.print_gaussian_model(mean, covariance, eigenvalues, eigenvectors)
@@ -78,9 +133,8 @@ def exercice_2_decorrelation():
 
     # L1.E2.5 Projetez la représentation des données sur la première composante principale
     # -------------------------------------------------------------------------
-    first_principal_component = numpy.zeros(
-        (3, 1)
-    )  # Sélectionnez la première composante principale
+    first_principal_component = eigenvectors[:, [2]]
+    # Sélectionnez la première composante principale
     decorrelated_samples = analysis.project_onto_new_basis(
         samples, first_principal_component
     )  # Complétez la fonction project_onto_new_basis dans analysis.py
@@ -89,24 +143,37 @@ def exercice_2_decorrelation():
         data=decorrelated_samples,
         labels=numpy.array(["Data"] * decorrelated_samples.shape[0]),
     )
-    viz.plot_pdf(
-        representation, n_bins=10, title="Projection des données sur la 1er composante"
+    # viz.plot_pdf(representation, n_bins=10, title="Projection des données sur la 1er composante")
+
+    plt.figure()
+    histogram, bin_edges = numpy.histogram(decorrelated_samples, bins=30, density=True)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    plt.bar(
+        bin_centers,
+        histogram,
+        width=bin_edges[1] - bin_edges[0],
+        alpha=0.6,
+        color="g",
+        label="Données projetées",
     )
-    # -------------------------------------------------------------------------
+    plt.title("Projection des données sur la 1ère composante principale")
+    plt.xlabel("Valeur projetée")
+    plt.ylabel("Densité de probabilité")
+    plt.legend()
+    # ---------------------------------------------------------------#----------
 
     # L1.E2.6 Projetez la représentation des données sur les 2e et 3e composantes principales
     # -------------------------------------------------------------------------
-    e23 = numpy.zeros((3, 2))  # Sélectionnez la 2e et 3e composante principale
+    e23 = eigenvectors[:, [0, 1]]  # Sélectionnez la 2e et 3e composante principale
     reduced_samples = analysis.project_onto_new_basis(
         samples, e23
     )  # Projetez les données sur les 2e et 3e composantes principales
 
-    projected_covariance = numpy.zeros(
-        (2, 2)
+    projected_covariance = numpy.cov(
+        reduced_samples, rowvar=False
     )  # Utilisez la fonction appropriée pour calculer la matrice de covariance des données projetées
-    projected_eigenvalues, projected_eigenvectors = (
-        numpy.zeros(2),
-        numpy.zeros((2, 2)),
+    projected_eigenvalues, projected_eigenvectors = numpy.linalg.eigh(
+        projected_covariance
     )  # Utilisez la fonction appropriée pour calculer les valeurs propres et vecteurs propres des données projetées
 
     print(
@@ -170,11 +237,10 @@ def exercice_3_visualisation_representation():
     # L1.E3.4 Calculer les variances sur chaque dimension pour la classe C1 ainsi que leur corrélations
     # -------------------------------------------------------------------------
     data_C1 = reprensentation.get_class("C1")
-    variances = numpy.zeros(
-        data_C1.shape[1]
-    )  # Utilisez la fonction appropriée pour calculer les variances
-    correlations = numpy.zeros(
-        (data_C1.shape[1], data_C1.shape[1])
+    variances = numpy.var(data_C1, axis=0)
+    # Utilisez la fonction appropriée pour calculer les variances
+    correlations = numpy.corrcoef(
+        data_C1, rowvar=False
     )  # Utilisez la fonction appropriée pour calculer les corrélations
     print("Exercice 3.4: Variances et corrélations pour la classe C1")
     print(f"Variances : {variances}")
@@ -187,7 +253,9 @@ def exercice_3_visualisation_representation():
 
     # Utilisez la fonction appropriée pour projeter les données sur la nouvelle base
     # Indice: Utilisez la fonction project_onto_new_basis définie précédement pour créer une nouvelle représentation des données
-    decorrelated_data = numpy.zeros_like(data3classes.data)
+    decorrelated_data = analysis.project_onto_new_basis(
+        data3classes.data, eigenvectors_C1
+    )
     decorrelated_representation = dataset.Representation(
         data=decorrelated_data, labels=data3classes.labels
     )
@@ -331,15 +399,16 @@ def exercice_4_choix_representation():
 def main():
     # pylint: disable = using-constant-test, multiple-statements
 
-    if True:
-        exercice_1_distributions_statistiques()
+    # if True:
+    #     # prep_1_distributions_statistiques()
+    #     exercice_2_decorrelation()
 
     # if True:
     #     exercice_2_decorrelation()
     # if True:
     #     exercice_3_visualisation_representation()
-    # if True:
-    #     exercice_4_choix_representation()
+    if True:
+        exercice_4_choix_representation()
 
 
 if __name__ == "__main__":
