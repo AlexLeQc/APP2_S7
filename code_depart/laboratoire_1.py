@@ -318,23 +318,69 @@ def exercice_4_choix_representation():
         scaled_hsv = analysis.rescale_hsv(image_hsv, n_bins=256)
         samples_hsv.append((scaled_hsv, label))
 
-    # Visualiez les histogrammes des images dans les différents espaces de couleur
-    # Indice: vous pouvez réutiliser la fonction viz.plot_images_histograms
+    # Histogrammes en espace LAB (L=luminosité, A=vert-rouge, B=bleu-jaune)
+    # L* est robuste aux changements d'éclairage car il encode la luminance perceptuelle.
+    # Les canaux a* et b* encodent la chrominance indépendamment de la luminosité.
+    viz.plot_images_histograms(
+        samples_lab,
+        n_bins=256,
+        title="Histogrammes des canaux LAB",
+        x_label="Valeur (mise à l'échelle 0-255)",
+        y_label="Nombre de pixels",
+        channel_names=["L* (luminosité)", "a* (vert→rouge)", "b* (bleu→jaune)"],
+        colors=["gray", "r", "b"],
+    )
 
+    # Histogrammes en espace HSV (H=teinte, S=saturation, V=luminosité)
+    # Le canal H encode la couleur pure, indépendamment de l'éclairage (V) et
+    # de l'intensité (S). Des images similaires sous éclairage différent auront
+    # donc un histogramme de H similaire mais un V différent → H est plus robuste.
+    viz.plot_images_histograms(
+        samples_hsv,
+        n_bins=256,
+        title="Histogrammes des canaux HSV",
+        x_label="Valeur (mise à l'échelle 0-255)",
+        y_label="Nombre de pixels",
+        channel_names=["H (teinte)", "S (saturation)", "V (luminosité)"],
+        colors=["purple", "orange", "gray"],
+    )
     # -------------------------------------------------------------------------
 
     # L1.E4.6 Calculer la moyen de chaque canal R, G et B pour chaque classe du dataset
     # =========================================================================
-    features = numpy.zeros((len(images), 6))  # 3 moyennes + 3 écarts-types
+    features = numpy.zeros((len(images), 6))  # 3 moyennes RGB + 3 écarts-types RGB
+    features_hsv = numpy.zeros((len(images), 3))  # moyennes H, S, V
+    features_lab = numpy.zeros((len(images), 3))  # moyennes L*, a*, b*
+
     for i, (image, _) in enumerate(images):
-        channels_mean = numpy.zeros(3)  # Calculer la moyenne de chaque canal R, G et B
+        image_norm = (
+            image / 255.0
+        )  # Normalisation [0,1] → réduit la sensibilité à la luminosité
+
+        # Moyenne de chaque canal R, G, B
+        channels_mean = numpy.mean(image_norm, axis=(0, 1))  # [mean_R, mean_G, mean_B]
 
         # L1.E4.7 Répéter pour une autre métrique de votre choix
         # ---------------------------------------------------------------------
-        other_feature = numpy.zeros(3)  # Calculer une autre métrique de votre choix
+        # Écart-type de chaque canal R, G, B : mesure la variabilité/texture.
+        other_feature = numpy.std(image_norm, axis=(0, 1))  # [std_R, std_G, std_B]
         # ---------------------------------------------------------------------
 
         features[i] = numpy.concatenate((channels_mean, other_feature))
+
+        # Moyennes en espace HSV
+        # H (teinte) : discrimine la couleur dominante indépendamment de l'éclairage
+        # S (saturation) : faible pour les villes grises, élevée pour forêts/plages
+        # V (luminosité) : sensible à l'éclairage → moins discriminant seul
+        image_hsv = skimage.color.rgb2hsv(image_norm)
+        features_hsv[i] = numpy.mean(image_hsv, axis=(0, 1))  # [mean_H, mean_S, mean_V]
+
+        # Moyennes en espace LAB
+        # L* : luminance perceptuelle (insensible à la couleur)
+        # a* : axe vert(-) ↔ rouge(+) → discrimine les forêts (négatif)
+        # b* : axe bleu(-) ↔ jaune(+) → discrimine les plages (positif = sable)
+        image_lab = skimage.color.rgb2lab(image_norm)
+        features_lab[i] = numpy.mean(image_lab, axis=(0, 1))  # [mean_L, mean_a, mean_b]
 
     features = numpy.array(features)
     # =========================================================================
@@ -367,18 +413,18 @@ def exercice_4_choix_representation():
     )
     viz.plot_data_distribution(
         representation_other_feature,
-        title="Distribution des images basée sur la métrique au choix",
-        xlabel="Rouge",
-        ylabel="Verte",
-        zlabel="Bleue",
+        title="Distribution des images basée sur l'écart-type des canaux RGB",
+        xlabel="std Rouge",
+        ylabel="std Vert",
+        zlabel="std Bleu",
     )
 
     viz.plot_features_distribution(
         representation_other_feature,
         n_bins=32,
-        title="Histogrammes de la métrique au choix",
-        features_names=["Rouge", "Vert", "Bleu"],
-        xlabel="Valeur",
+        title="Histogrammes de l'écart-type des canaux RGB",
+        features_names=["std Rouge", "std Vert", "std Bleu"],
+        xlabel="Écart-type",
         ylabel="Nombre d'images",
     )
 
@@ -391,6 +437,102 @@ def exercice_4_choix_representation():
     print("Variances et corrélations pour la classe coast")
     print(f"Variances : {variances}")
     print(f"Corrélations : \n{correlations}")
+    # -------------------------------------------------------------------------
+
+    # Distribution des images en espace HSV
+    # -------------------------------------------------------------------------
+    representation_hsv = dataset.Representation(data=features_hsv, labels=images.labels)
+
+    viz.plot_data_distribution(
+        representation_hsv,
+        title="Distribution des images — moyennes des canaux HSV",
+        xlabel="H (teinte)",
+        ylabel="S (saturation)",
+        zlabel="V (luminosité)",
+    )
+    viz.plot_features_distribution(
+        representation_hsv,
+        n_bins=32,
+        title="Histogrammes des moyennes HSV par classe",
+        features_names=[
+            "mean_H (teinte)",
+            "mean_S (saturation)",
+            "mean_V (luminosité)",
+        ],
+        xlabel="Valeur moyenne",
+        ylabel="Nombre d'images",
+    )
+    # -------------------------------------------------------------------------
+
+    # Distribution des images en espace LAB
+    # -------------------------------------------------------------------------
+    representation_lab = dataset.Representation(data=features_lab, labels=images.labels)
+
+    viz.plot_data_distribution(
+        representation_lab,
+        title="Distribution des images — moyennes des canaux LAB",
+        xlabel="L* (luminance)",
+        ylabel="a* (vert↔rouge)",
+        zlabel="b* (bleu↔jaune)",
+    )
+    viz.plot_features_distribution(
+        representation_lab,
+        n_bins=32,
+        title="Histogrammes des moyennes LAB par classe",
+        features_names=[
+            "mean_L* (luminance)",
+            "mean_a* (vert↔rouge)",
+            "mean_b* (bleu↔jaune)",
+        ],
+        xlabel="Valeur moyenne",
+        ylabel="Nombre d'images",
+    )
+    # -------------------------------------------------------------------------
+
+    # Représentation 3D combinée : H (HSV) × b* (LAB) × Blue (RGB)
+    # Ces 3 features viennent d'espaces différents et capturent des aspects
+    # complémentaires :
+    #   H (teinte HSV)   : couleur dominante robuste à l'éclairage
+    #   b* (LAB)         : axe bleu↔jaune → sépare plage (sable=jaune) vs forêt/ville
+    #   mean_Blue (RGB)  : quantité brute de bleu → détecte ciel/océan (plage/ville)
+    # -------------------------------------------------------------------------
+    mean_H_all = numpy.zeros(len(images))
+    mean_bstar_all = numpy.zeros(len(images))
+    mean_Blue_all = numpy.zeros(len(images))
+
+    for i, (image, _) in enumerate(images):
+        image_norm = image / 255.0
+
+        hsv = skimage.color.rgb2hsv(image_norm)
+        mean_H_all[i] = numpy.mean(hsv[:, :, 0])  # canal H uniquement
+
+        lab = skimage.color.rgb2lab(image_norm)
+        mean_bstar_all[i] = numpy.mean(lab[:, :, 2])  # canal b* uniquement
+
+        mean_Blue_all[i] = numpy.mean(image_norm[:, :, 2])  # canal Bleu RGB uniquement
+
+    # Normalisation min-max de chaque feature dans [0, 1] pour que les 3 axes
+    # soient comparables (b* est dans [-128,127], H dans [0,1], Blue dans [0,1])
+    def minmax(x):
+        return (x - x.min()) / (x.max() - x.min())
+
+    combined_3d = numpy.column_stack(
+        [
+            minmax(mean_H_all),
+            minmax(mean_bstar_all),
+            minmax(mean_Blue_all),
+        ]
+    )
+    representation_combined = dataset.Representation(
+        data=combined_3d, labels=images.labels
+    )
+    viz.plot_data_distribution(
+        representation_combined,
+        title="Représentation combinée : H (HSV) × b* (LAB) × Blue (RGB)",
+        xlabel="mean_H (teinte HSV)",
+        ylabel="mean_b* (bleu↔jaune LAB)",
+        zlabel="mean_Blue (RGB)",
+    )
     # -------------------------------------------------------------------------
 
     plt.show()
