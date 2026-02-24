@@ -1,11 +1,17 @@
+import pathlib
+
 import helpers.dataset as dataset
 import numpy
-import scipy.signal
 import skimage
+import skimage.color
+import skimage.filters
 import sklearn
+import sklearn.decomposition
 import sklearn.preprocessing
 from helpers import analysis, classifier, viz
 from matplotlib import pyplot as plt
+
+_HERE = pathlib.Path(__file__).parent
 
 
 def extract_std_rgb(img_normalized: numpy.ndarray) -> numpy.ndarray:
@@ -21,12 +27,21 @@ def extract_noise_fft(image: numpy.ndarray) -> float:
     return float(numpy.mean(numpy.abs(fft_shifted)))
 
 
-def extract_lab_b_peaks(image: numpy.ndarray) -> float:
-    """Calcule le nombre de pics dans le canal b de l'espace Lab"""
-    image_lab = skimage.color.rgb2lab(image / 255.0)
-    scaled_lab = analysis.rescale_lab(image_lab, n_bins=256)
-    peaks_b, _ = scipy.signal.find_peaks(scaled_lab[:, :, 2].flatten())
-    return float(len(peaks_b))
+def extract_lab_b_mean(image: numpy.ndarray) -> float:
+    """Calcule la couleur moyenne sur l'axe Bleu-Jaune.
+    - Côte  : b moyen élevé (Sable jaune dominant)
+    - Forêt : b moyen faible/négatif (Végétation verte/brune)
+    - Ville : b moyen proche de zéro (Béton gris)
+    """
+    if image.size == 0:
+        return 0.0
+
+    # On normalise en float pour skimage
+    img_norm = image / 255.0 if image.max() > 1.0 else image
+    image_lab = skimage.color.rgb2lab(img_norm)
+
+    # On prend la moyenne du canal b* (index 2)
+    return float(numpy.mean(image_lab[:, :, 2]))
 
 
 def extract_std_red(image: numpy.ndarray) -> float:
@@ -35,16 +50,26 @@ def extract_std_red(image: numpy.ndarray) -> float:
 
 
 def extract_ratio_vh(image: numpy.ndarray) -> float:
-    """Calcule le ratio entre les contours verticaux et horizontaux"""
-    gray_image = numpy.mean(image, axis=-1)
-    edges = skimage.filters.sobel(gray_image)
-    vertical_edges = numpy.sum(numpy.abs(edges[:, :-1] - edges[:, 1:]))
-    horizontal_edges = numpy.sum(numpy.abs(edges[:-1, :] - edges[1:, :]))
-    return float(vertical_edges / (horizontal_edges + 1e-8))
+    """Ratio énergie Sobel vertical / horizontal.
+
+    - Ville  : dominance de lignes verticales (bâtiments) → ratio >> 1
+    - Côte   : horizon dominant (ligne horizontale) → ratio < 1
+    - Forêt  : isotrope (textures sans direction) → ratio ≈ 1
+    """
+    if image.size == 0:
+        return 1.0
+    gray = (
+        numpy.mean(image, axis=-1) / 255.0
+        if image.max() > 1.0
+        else numpy.mean(image, axis=-1)
+    )
+    edges_v = numpy.abs(skimage.filters.sobel_v(gray))
+    edges_h = numpy.abs(skimage.filters.sobel_h(gray))
+    return float(numpy.sum(edges_v) / (numpy.sum(edges_h) + 1e-8))
 
 
 def problematique():
-    images = dataset.ImageDataset("data/image_dataset/")
+    images = dataset.ImageDataset(_HERE / "data/image_dataset/")
 
     # TODO Problématique: Générez une représentation des images appropriée
     # pour la classification comme dans le laboratoire 1.
@@ -54,31 +79,33 @@ def problematique():
     for image, label in images:
         # Extraction via les fonctions séparées (basées sur l'image brute 0-255)
         noise_level = extract_noise_fft(image)
-        lab_b_peaks = extract_lab_b_peaks(image)
+        lab_b_mean = extract_lab_b_mean(image)
         std_red = extract_std_red(image)
         ratio_vh = extract_ratio_vh(image)
 
         # Assemblage du vecteur de caractéristiques (4 dimensions)
-        features_list.append([noise_level, lab_b_peaks, std_red, ratio_vh])
+        features_list.append([noise_level, lab_b_mean, std_red, ratio_vh])
 
     features = numpy.array(features_list, dtype=numpy.float32)
-    representation = dataset.Representation(data=features, labels=images.labels)
     # -------------------------------------------------------------------------
 
     # TODO: Problématique: Visualisez cette représentation
     # -------------------------------------------------------------------------
-    feature_names = ["Bruit", "Pics Lab(b)", "Écart R", "Ratio Vert/Horiz"]
-
-    # Affichage des histogrammes pour chaque caractéristique
-    viz.plot_features_distribution(
-        representation,
-        n_bins=32,
-        title="Distribution des caractéristiques",
-        features_names=feature_names,
-    )
+    feature_names = ["Bruit", "Moyenne Lab(b)", "Écart R", "Ratio Vert/Horiz"]
 
     scaler = sklearn.preprocessing.StandardScaler()
     features_scaled = scaler.fit_transform(features)
+
+    representation_scaled = dataset.Representation(
+        data=features_scaled, labels=images.labels
+    )
+
+    viz.plot_features_distribution(
+        representation_scaled,
+        n_bins=32,
+        title="Distribution des caractéristiques (Normalisées)",
+        features_names=feature_names,
+    )
 
     pca = sklearn.decomposition.PCA(n_components=3)
     features_pca = pca.fit_transform(features_scaled)
