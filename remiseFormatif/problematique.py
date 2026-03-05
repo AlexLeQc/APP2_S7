@@ -1,12 +1,11 @@
+import helpers.dataset as dataset
 import numpy
 import scipy.signal
 import skimage
 import sklearn
 import sklearn.preprocessing
-from matplotlib import pyplot as plt
-
-import helpers.dataset as dataset
 from helpers import analysis, classifier, viz
+from matplotlib import pyplot as plt
 
 
 def extract_std_rgb(img_normalized: numpy.ndarray) -> numpy.ndarray:
@@ -138,27 +137,21 @@ def problematique():
 
     # 3. Réseau de Neurones Artificiels (RNA)
     print("\n3. Réseau de Neurones")
+    # Choix préliminaire: 1 couche cachée de 8 neurones
     rna = classifier.NeuralNetworkClassifier(
         input_dim=train_repr.dim,
         output_dim=len(train_repr.unique_labels),
-        n_hidden=3,
-        n_neurons=16,
-        lr=0.005,
-        n_epochs=500,
-        batch_size=32,
+        n_hidden=2,
+        n_neurons=8,
+        lr=0.01,
+        n_epochs=50,
+        batch_size=16,
     )
     rna.fit(train_repr)
-
-    viz.plot_metric_history(rna.history)
-
     pred_rna_idx = rna.predict(test_data)
     pred_rna_labels = numpy.array([train_repr.unique_labels[i] for i in pred_rna_idx])
     err_rna, _ = analysis.compute_error_rate(test_labels, pred_rna_labels)
     print(f"Taux d'erreur RNA : {err_rna * 100:.2f}%")
-
-    viz.show_confusion_matrix(
-        test_labels, pred_rna_labels, train_repr.unique_labels, plot=True
-    )
     # -------------------------------------------------------------------------
 
 
