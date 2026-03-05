@@ -63,27 +63,17 @@ Fonctions:
 
 import dataclasses
 import itertools
-
 from typing import List, Optional, Tuple, Union
 
 import keras
-import matplotlib.pyplot as plt
 import matplotlib.colors
+import matplotlib.pyplot as plt
 import numpy
 
-from . import (
-    analysis,
-    classifier,
-    dataset
-)
-
+from . import analysis, classifier, dataset
 
 DEFAULT_FIGSIZE = (6, 4)
-CMAP = matplotlib.colors.ListedColormap([
-    "orange",
-    "purple",
-    "gray"
-])
+CMAP = matplotlib.colors.ListedColormap(["orange", "purple", "gray"])
 
 
 @dataclasses.dataclass
@@ -103,13 +93,16 @@ class GaussianModel:
             Crée une instance de GaussianModel à partir d'un tuple contenant la moyenne,
             la matrice de covariance, les valeurs propres et les vecteurs propres.
     """
+
     mean: numpy.ndarray
     covariance: numpy.ndarray
     eigenvalues: numpy.ndarray
     eigenvectors: numpy.ndarray
 
     @classmethod
-    def from_tuple(cls, data: Tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray, numpy.ndarray]) -> 'GaussianModel':
+    def from_tuple(
+        cls, data: Tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray, numpy.ndarray]
+    ) -> "GaussianModel":
         """
         Crée une instance de GaussianModel à partir d'un tuple contenant la moyenne,
         la matrice de covariance, les valeurs propres et les vecteurs propres.
@@ -129,13 +122,15 @@ class GaussianModel:
         return cls(mean, covariance, eigenvalues, eigenvectors)
 
 
-def _get_axes(ax: Optional[plt.Axes] = None,
-              projection: str = None,
-              figsize: Tuple[int, int] = DEFAULT_FIGSIZE,
-              title: str = None,
-              xlabel: str = None,
-              ylabel: str = None,
-              zlabel: str = None) -> Tuple[plt.Figure, plt.Axes]:
+def _get_axes(
+    ax: Optional[plt.Axes] = None,
+    projection: str = None,
+    figsize: Tuple[int, int] = DEFAULT_FIGSIZE,
+    title: str = None,
+    xlabel: str = None,
+    ylabel: str = None,
+    zlabel: str = None,
+) -> Tuple[plt.Figure, plt.Axes]:
     """
     Crée ou récupère des axes matplotlib en 2D ou 3D et configure les labels et le titre.
 
@@ -162,18 +157,24 @@ def _get_axes(ax: Optional[plt.Axes] = None,
     else:
         fig = ax.figure
 
-    if title: ax.set_title(title)
-    if xlabel: ax.set_xlabel(xlabel)
-    if ylabel: ax.set_ylabel(ylabel)
-    if zlabel and projection == "3d": ax.set_zlabel(zlabel)
+    if title:
+        ax.set_title(title)
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    if zlabel and projection == "3d":
+        ax.set_zlabel(zlabel)
 
     return fig, ax
 
 
-def _create_subplot_grid(n_plots: int, 
-                         figsize_per_plot: Tuple[int, int] = DEFAULT_FIGSIZE,
-                         ax: Optional[plt.Axes] = None,
-                         title: str = None) -> Tuple[plt.Figure, plt.Axes]:
+def _create_subplot_grid(
+    n_plots: int,
+    figsize_per_plot: Tuple[int, int] = DEFAULT_FIGSIZE,
+    ax: Optional[plt.Axes] = None,
+    title: str = None,
+) -> Tuple[plt.Figure, plt.Axes]:
     """
     Crée une grille de sous-graphes pour afficher plusieurs graphiques.
 
@@ -210,7 +211,9 @@ def _create_subplot_grid(n_plots: int,
     return fig, axes
 
 
-def plot_images(samples: List[Tuple[numpy.ndarray, str]], title: str = "Échantillons d'images"):
+def plot_images(
+    samples: List[Tuple[numpy.ndarray, str]], title: str = "Échantillons d'images"
+):
     """
     Génère une grille d'images échantillonnées.
 
@@ -218,17 +221,24 @@ def plot_images(samples: List[Tuple[numpy.ndarray, str]], title: str = "Échanti
         samples (List[Tuple[numpy.ndarray, str]]): Liste de tuples contenant les images et leurs classes respectives.
         title (str): Titre global de la figure.
     """
-    fig, axes = _create_subplot_grid(len(samples), figsize_per_plot=DEFAULT_FIGSIZE, title=title)
+    fig, axes = _create_subplot_grid(
+        len(samples), figsize_per_plot=DEFAULT_FIGSIZE, title=title
+    )
 
     for ax, (image, label) in zip(axes, samples):
         ax.imshow(image / 255.0)
         ax.set_title(label)
-        ax.axis('off')
+        ax.axis("off")
 
     fig.tight_layout()
 
 
-def print_gaussian_model(mean: numpy.ndarray, covariance: numpy.ndarray, eigenvalues: numpy.ndarray, eigenvectors: numpy.ndarray):
+def print_gaussian_model(
+    mean: numpy.ndarray,
+    covariance: numpy.ndarray,
+    eigenvalues: numpy.ndarray,
+    eigenvectors: numpy.ndarray,
+):
     """
     Affiche les paramètres d'un modèle gaussien.
 
@@ -244,15 +254,17 @@ def print_gaussian_model(mean: numpy.ndarray, covariance: numpy.ndarray, eigenva
     print(f"Vecteurs propres : \n{eigenvectors}")
 
 
-def plot_data_distribution(representation: dataset.Representation,
-                           title: str = "Distribution des données",
-                           xlabel: str = "X",
-                           ylabel: str = "Y",
-                           zlabel: str = "Z",
-                           show_components: bool = False,
-                           show_ellipses: bool = False,
-                           analytical_boundaries: bool = False,
-                           priors: Optional[numpy.ndarray] = None) -> Tuple[plt.Figure, plt.Axes]:
+def plot_data_distribution(
+    representation: dataset.Representation,
+    title: str = "Distribution des données",
+    xlabel: str = "X",
+    ylabel: str = "Y",
+    zlabel: str = "Z",
+    show_components: bool = False,
+    show_ellipses: bool = False,
+    analytical_boundaries: bool = False,
+    priors: Optional[numpy.ndarray] = None,
+) -> Tuple[plt.Figure, plt.Axes]:
     """
     Affiche la distribution des données en 2D ou 3D.
 
@@ -274,26 +286,32 @@ def plot_data_distribution(representation: dataset.Representation,
         ValueError: Si les données ne sont pas en 2D ou 3D.
     """
     if representation.dim not in [2, 3]:
-        raise ValueError("La visualisation n'est supportée que pour des données en 2D ou 3D.")
+        raise ValueError(
+            "La visualisation n'est supportée que pour des données en 2D ou 3D."
+        )
 
     projection = None
     if representation.dim == 3:
         projection = "3d"
 
-    fig, ax = _get_axes(projection=projection, title=title, xlabel=xlabel, ylabel=ylabel, zlabel=zlabel)
+    fig, ax = _get_axes(
+        projection=projection, title=title, xlabel=xlabel, ylabel=ylabel, zlabel=zlabel
+    )
 
     unique_labels = representation.unique_labels
 
     colors = CMAP(numpy.linspace(0, 1, len(unique_labels)))
 
     for i, label in enumerate(unique_labels):
-        data =  representation.get_class(label)
+        data = representation.get_class(label)
 
         color = colors[i]
 
         # plot the scatter points
         if representation.dim == 3:
-            ax.scatter(data[:, 0], data[:, 1], data[:, 2], label=label, alpha=0.25, color=color)
+            ax.scatter(
+                data[:, 0], data[:, 1], data[:, 2], label=label, alpha=0.25, color=color
+            )
         elif representation.dim == 2:
             ax.scatter(data[:, 0], data[:, 1], label=label, alpha=0.25, color=color)
 
@@ -308,7 +326,7 @@ def plot_data_distribution(representation: dataset.Representation,
             gaussian_model = analysis.compute_gaussian_model(data)
             model = GaussianModel.from_tuple(gaussian_model)
             add_ellipse(ax, model)
-    
+
     if analytical_boundaries:
         add_analytical_decision_regions(ax, representation, priors=priors)
 
@@ -337,13 +355,26 @@ def add_gaussian_components(ax: plt.Axes, model: GaussianModel, scale: float = 1
     origin = model.mean
 
     if dim not in [2, 3]:
-        raise ValueError("La visualisation n'est supportée que pour des données en 2D ou 3D.")
+        raise ValueError(
+            "La visualisation n'est supportée que pour des données en 2D ou 3D."
+        )
 
     for i in range(dim):
         vector = model.eigenvectors[:, i] * numpy.sqrt(model.eigenvalues[i]) * scale
-        
+
         if dim == 2:
-            ax.quiver(*origin, *vector, color=color[i], alpha=1, angles="xy", scale_units="xy", scale=1, width=0.005, headwidth=2, headlength=4)
+            ax.quiver(
+                *origin,
+                *vector,
+                color=color[i],
+                alpha=1,
+                angles="xy",
+                scale_units="xy",
+                scale=1,
+                width=0.005,
+                headwidth=2,
+                headlength=4,
+            )
         elif dim == 3:
             ax.quiver(*origin, *vector, color=color[i], alpha=1)
 
@@ -358,7 +389,11 @@ def plot_metric_history(history: keras.callbacks.History):
     metrics = [key for key in history.history.keys() if not key.startswith("val_")]
     n_metrics = len(metrics)
 
-    fig, axes = _create_subplot_grid(n_metrics, figsize_per_plot=DEFAULT_FIGSIZE, title="Historique des métriques durant l'entraînement")
+    fig, axes = _create_subplot_grid(
+        n_metrics,
+        figsize_per_plot=DEFAULT_FIGSIZE,
+        title="Historique des métriques durant l'entraînement",
+    )
 
     for ax, metric in zip(axes, metrics):
         ax.plot(history.history[metric], label="training")
@@ -376,7 +411,14 @@ def plot_metric_history(history: keras.callbacks.History):
 
     fig.tight_layout()
 
-def show_confusion_matrix(target: numpy.ndarray, predictions: numpy.ndarray, class_labels: List[str], plot: bool = True):
+
+def show_confusion_matrix(
+    target: numpy.ndarray,
+    predictions: numpy.ndarray,
+    class_labels: List[str],
+    title: str = "Matrice de confusion",
+    plot: bool = True,
+):
     """
     Affiche la matrice de confusion entre les étiquettes cibles et les prédictions.
 
@@ -394,7 +436,12 @@ def show_confusion_matrix(target: numpy.ndarray, predictions: numpy.ndarray, cla
     if not plot:
         return
 
-    fig, ax = _get_axes(figsize=DEFAULT_FIGSIZE, title="Matrice de confusion", xlabel="Prédictions", ylabel="Cibles")
+    fig, ax = _get_axes(
+        figsize=DEFAULT_FIGSIZE,
+        title=title,
+        xlabel="Prédictions",
+        ylabel="Cibles",
+    )
 
     ax.imshow(confusion_matrix, cmap="Blues")
     fig.colorbar(ax.images[0], ax=ax)
@@ -404,7 +451,9 @@ def show_confusion_matrix(target: numpy.ndarray, predictions: numpy.ndarray, cla
     fig.tight_layout()
 
 
-def plot_numerical_decision_regions(model: classifier.Classifier, data: Union[dataset.Representation, numpy.ndarray]):
+def plot_numerical_decision_regions(
+    model: classifier.Classifier, data: Union[dataset.Representation, numpy.ndarray]
+):
     """
     Affiche les frontières de décision d'un classificateur numérique sur des données 2D,
     en utilisant une grille de points uniformément distribués à prédire dans l'espace des caractéristiques.
@@ -419,7 +468,9 @@ def plot_numerical_decision_regions(model: classifier.Classifier, data: Union[da
     data = data.data if isinstance(data, dataset.Representation) else data
 
     if data.shape[1] != 2:
-        raise ValueError("La visualisation des frontières de décision n'est supportée que pour des données en 2D.")
+        raise ValueError(
+            "La visualisation des frontières de décision n'est supportée que pour des données en 2D."
+        )
 
     margins = (data.max(axis=0) - data.min(axis=0)) * 0.1
     min_features = data.min(axis=0) - margins
@@ -435,7 +486,7 @@ def plot_numerical_decision_regions(model: classifier.Classifier, data: Union[da
     # Predict classes for each sample in the grid
     grid_predictions = model.predict(points)
 
-    if len(grid_predictions.shape) > 1 and grid_predictions.shape[1] > 1: # logits
+    if len(grid_predictions.shape) > 1 and grid_predictions.shape[1] > 1:  # logits
         prediction = numpy.argmax(grid_predictions, axis=-1)
     else:
         prediction = grid_predictions
@@ -448,7 +499,12 @@ def plot_numerical_decision_regions(model: classifier.Classifier, data: Union[da
     prediction = prediction.reshape(mesh[0].shape)
 
     # Plot decision regions
-    fig, ax = _get_axes(figsize=DEFAULT_FIGSIZE, title="Frontières de décision numérique", xlabel="X", ylabel="Y")
+    fig, ax = _get_axes(
+        figsize=DEFAULT_FIGSIZE,
+        title="Frontières de décision numérique",
+        xlabel="X",
+        ylabel="Y",
+    )
 
     ax.contourf(*mesh, prediction, cmap=CMAP, alpha=1)
 
@@ -458,9 +514,11 @@ def plot_numerical_decision_regions(model: classifier.Classifier, data: Union[da
     fig.tight_layout()
 
 
-def add_analytical_decision_regions(ax: plt.Axes,
-                                    representation: dataset.Representation,
-                                    priors: Optional[numpy.ndarray] = None):
+def add_analytical_decision_regions(
+    ax: plt.Axes,
+    representation: dataset.Representation,
+    priors: Optional[numpy.ndarray] = None,
+):
     """
     Ajoute les frontières de décision analytiques basées sur des modèles gaussiens
     à un axe 2D existant.
@@ -474,7 +532,9 @@ def add_analytical_decision_regions(ax: plt.Axes,
         ValueError: Si les données ne sont pas en 2D.
     """
     if representation.dim != 2:
-        raise ValueError("La visualisation des frontières de décision n'est supportée que pour des données en 2D.")
+        raise ValueError(
+            "La visualisation des frontières de décision n'est supportée que pour des données en 2D."
+        )
 
     margins = (representation.data.max(axis=0) - representation.data.min(axis=0)) * 0.1
     min_features = representation.data.min(axis=0) - margins
@@ -488,13 +548,21 @@ def add_analytical_decision_regions(ax: plt.Axes,
     points = numpy.vstack([axis.flatten() for axis in mesh]).T
 
     if priors is None:
-        priors = numpy.array([1 / len(representation.unique_labels)] * len(representation.unique_labels))
+        priors = numpy.array(
+            [1 / len(representation.unique_labels)] * len(representation.unique_labels)
+        )
 
-    label_to_index = {label: index for index, label in enumerate(representation.unique_labels)}
+    label_to_index = {
+        label: index for index, label in enumerate(representation.unique_labels)
+    }
 
     for pair in itertools.combinations(representation.unique_labels, 2):
-        mean1, cov1, _, _ = analysis.compute_gaussian_model(representation.get_class(pair[0]))
-        mean2, cov2, _, _ = analysis.compute_gaussian_model(representation.get_class(pair[1]))
+        mean1, cov1, _, _ = analysis.compute_gaussian_model(
+            representation.get_class(pair[0])
+        )
+        mean2, cov2, _, _ = analysis.compute_gaussian_model(
+            representation.get_class(pair[1])
+        )
 
         inv_cov1 = numpy.linalg.inv(cov1)
         inv_cov2 = numpy.linalg.inv(cov2)
@@ -511,10 +579,14 @@ def add_analytical_decision_regions(ax: plt.Axes,
             - 2 * numpy.log(priors[idx1] / priors[idx2])
         )
 
-        Z = numpy.sum(points @ quadratic_discriminant * points, axis=1) + points @ linear_discriminant + bias_term
+        Z = (
+            numpy.sum(points @ quadratic_discriminant * points, axis=1)
+            + points @ linear_discriminant
+            + bias_term
+        )
         Z = Z.reshape(mesh[0].shape)
 
-        ax.contour(*mesh, Z, levels=[0], colors='k', linewidths=2)
+        ax.contour(*mesh, Z, levels=[0], colors="k", linewidths=2)
 
 
 def add_ellipse(ax: plt.Axes, model: GaussianModel):
@@ -540,10 +612,9 @@ def add_ellipse(ax: plt.Axes, model: GaussianModel):
         val1, val2 = model.eigenvalues[list(plane)]
         vec1, vec2 = model.eigenvectors[:, list(plane)].T
 
-        ellipse = numpy.vstack([
-            numpy.sqrt(1) * numpy.cos(theta),
-            numpy.sqrt(1) * numpy.sin(theta)
-        ])
+        ellipse = numpy.vstack(
+            [numpy.sqrt(1) * numpy.cos(theta), numpy.sqrt(1) * numpy.sin(theta)]
+        )
         # ---------------------------------------------------------------------
 
         basis = model.eigenvectors[:, plane]
@@ -553,12 +624,14 @@ def add_ellipse(ax: plt.Axes, model: GaussianModel):
         ax.plot(*projected_ellipse.T, color="black", linewidth=2, alpha=0.8)
 
 
-def plot_classification_errors(representation: dataset.Representation,
-                               predictions: numpy.ndarray,
-                               title: str = "Erreurs de classification",
-                               xlabel: str = "X",
-                               ylabel: str = "Y",
-                               zlabel: str = "Z",):
+def plot_classification_errors(
+    representation: dataset.Representation,
+    predictions: numpy.ndarray,
+    title: str = "Erreurs de classification",
+    xlabel: str = "X",
+    ylabel: str = "Y",
+    zlabel: str = "Z",
+):
     """
     Affiche les erreurs de classification sur la distribution des données en 2D ou 3D.
 
@@ -574,37 +647,45 @@ def plot_classification_errors(representation: dataset.Representation,
         ValueError: Si les données ne sont pas en 2D ou 3D.
     """
     if representation.dim not in [2, 3]:
-        raise ValueError("La visualisation n'est supportée que pour des données en 2D ou 3D.")
+        raise ValueError(
+            "La visualisation n'est supportée que pour des données en 2D ou 3D."
+        )
 
     projection = None
     if representation.dim == 3:
         projection = "3d"
 
-    fig, ax = _get_axes(projection=projection, title=title, xlabel=xlabel, ylabel=ylabel, zlabel=zlabel)
+    fig, ax = _get_axes(
+        projection=projection, title=title, xlabel=xlabel, ylabel=ylabel, zlabel=zlabel
+    )
 
     unique_labels = representation.unique_labels
 
     colors = CMAP(numpy.linspace(0, 1, len(unique_labels)))
 
     for i, label in enumerate(unique_labels):
-        data =  representation.get_class(label)
+        data = representation.get_class(label)
 
         color = colors[i]
 
         # plot the scatter points
         if representation.dim == 3:
-            ax.scatter(data[:, 0], data[:, 1], data[:, 2], label=label, alpha=0.25, color=color)
+            ax.scatter(
+                data[:, 0], data[:, 1], data[:, 2], label=label, alpha=0.25, color=color
+            )
         elif representation.dim == 2:
             ax.scatter(data[:, 0], data[:, 1], label=label, alpha=0.25, color=color)
 
     error_mask = predictions != representation.labels
     error_indices = numpy.where(error_mask)[0]
 
-    ax.scatter(representation.data[error_indices, 0],
-               representation.data[error_indices, 1],
-               representation.data[error_indices, 2] if representation.dim == 3 else None,
-               label="Erreurs",
-               color="red")
+    ax.scatter(
+        representation.data[error_indices, 0],
+        representation.data[error_indices, 1],
+        representation.data[error_indices, 2] if representation.dim == 3 else None,
+        label="Erreurs",
+        color="red",
+    )
 
     ax_handles, ax_labels = ax.get_legend_handles_labels()
     fig.legend(ax_handles, ax_labels, loc="upper right", bbox_to_anchor=(1, 0.925))
@@ -612,7 +693,9 @@ def plot_classification_errors(representation: dataset.Representation,
     fig.tight_layout()
 
 
-def plot_pdf(representation: dataset.Representation, n_bins: int = 10, title: str = None):
+def plot_pdf(
+    representation: dataset.Representation, n_bins: int = 10, title: str = None
+):
     """
     Affiche les histogrammes de densité de probabilité 1D et 2D pour chaque
     classe dans la représentation.
@@ -627,7 +710,9 @@ def plot_pdf(representation: dataset.Representation, n_bins: int = 10, title: st
         ValueError: Si les données ne sont pas en 1D ou 2D.
     """
     if representation.dim not in [1, 2]:
-        raise ValueError("La visualisation des histogrammes n'est supportée que pour des données en 1D ou 2D.")
+        raise ValueError(
+            "La visualisation des histogrammes n'est supportée que pour des données en 1D ou 2D."
+        )
 
     dim = representation.dim
 
@@ -653,12 +738,23 @@ def plot_pdf(representation: dataset.Representation, n_bins: int = 10, title: st
             title = f"Histogramme densité de probabilité - Classe {label}"
 
         if dim == 1:
-            _, axes = _get_axes(projection=projection, title=title, xlabel="X", ylabel="Densité de probabilité")
+            _, axes = _get_axes(
+                projection=projection,
+                title=title,
+                xlabel="X",
+                ylabel="Densité de probabilité",
+            )
 
             axes.bar(bin_centers[0], histogram, width=bin_widths[0], color=color)
 
         elif dim == 2:
-            _, axes = _get_axes(projection=projection, title=title, xlabel="X", ylabel="Y", zlabel="Densité de probabilité")
+            _, axes = _get_axes(
+                projection=projection,
+                title=title,
+                xlabel="X",
+                ylabel="Y",
+                zlabel="Densité de probabilité",
+            )
 
             xpos, ypos = numpy.meshgrid(bin_centers[0], bin_centers[1], indexing="ij")
             xwidth, ywidth = numpy.meshgrid(bin_widths[0], bin_widths[1], indexing="ij")
@@ -667,23 +763,29 @@ def plot_pdf(representation: dataset.Representation, n_bins: int = 10, title: st
             max_height = numpy.max(dz)
             min_height = numpy.min(dz)
 
-            cmap = plt.get_cmap('viridis')
+            cmap = plt.get_cmap("viridis")
             colors_2d = cmap((dz - min_height) / (max_height - min_height + 1e-9))
 
-            axes.bar3d(xpos.ravel(),
-                       ypos.ravel(),
-                       numpy.zeros_like(dz),
-                       dx=xwidth.ravel(),
-                       dy=ywidth.ravel(),
-                       dz=dz,
-                       zsort='average',
-                       alpha=0.5,
-                       color=colors_2d)
+            axes.bar3d(
+                xpos.ravel(),
+                ypos.ravel(),
+                numpy.zeros_like(dz),
+                dx=xwidth.ravel(),
+                dy=ywidth.ravel(),
+                dz=dz,
+                zsort="average",
+                alpha=0.5,
+                color=colors_2d,
+            )
 
 
-def plot_data_distribution_with_custom_components(representation: dataset.Representation,
-                                                   model: Union[GaussianModel, Tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray, numpy.ndarray]],
-                                                   title: str = "Distribution des points générés"):
+def plot_data_distribution_with_custom_components(
+    representation: dataset.Representation,
+    model: Union[
+        GaussianModel, Tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray, numpy.ndarray]
+    ],
+    title: str = "Distribution des points générés",
+):
     """
     Affiche la distribution des données en 2D ou 3D avec des composantes gaussiennes personnalisées.
 
@@ -708,13 +810,15 @@ def plot_data_distribution_with_custom_components(representation: dataset.Repres
         ax.set_zlim([-limit, limit])
 
 
-def plot_images_histograms(samples: List[Tuple[numpy.ndarray, str]],
-                          n_bins: int = 256,
-                          title: str = "Histogrammes des canaux par image",
-                          x_label: str = None,
-                          y_label: str = None,
-                          channel_names: Optional[List[str]] = None,
-                          colors: Optional[List[str]] = None):
+def plot_images_histograms(
+    samples: List[Tuple[numpy.ndarray, str]],
+    n_bins: int = 256,
+    title: str = "Histogrammes des canaux par image",
+    x_label: str = None,
+    y_label: str = None,
+    channel_names: Optional[List[str]] = None,
+    colors: Optional[List[str]] = None,
+):
     """
     Affiche les histogrammes des canaux de chaque image échantillonnée.
 
@@ -729,14 +833,20 @@ def plot_images_histograms(samples: List[Tuple[numpy.ndarray, str]],
     """
     n_channels = samples[0][0].shape[-1]
 
-    fig, axes = _create_subplot_grid(len(samples), figsize_per_plot=DEFAULT_FIGSIZE, title=title)
+    fig, axes = _create_subplot_grid(
+        len(samples), figsize_per_plot=DEFAULT_FIGSIZE, title=title
+    )
 
     for ax, (image, label) in zip(axes, samples):
         for channel in range(n_channels):
-            channel_label = channel_names[channel] if channel_names else f"Canal {channel}"
+            channel_label = (
+                channel_names[channel] if channel_names else f"Canal {channel}"
+            )
             color = colors[channel] if colors else None
 
-            histogram, bin_edges = numpy.histogram(image[:, :, channel], bins=n_bins, range=(0, n_bins - 1))
+            histogram, bin_edges = numpy.histogram(
+                image[:, :, channel], bins=n_bins, range=(0, n_bins - 1)
+            )
 
             ax.plot(bin_edges[:-1], histogram, label=channel_label, color=color)
 
@@ -756,12 +866,14 @@ def plot_images_histograms(samples: List[Tuple[numpy.ndarray, str]],
     fig.tight_layout()
 
 
-def plot_features_distribution(representation: dataset.Representation,
-                               n_bins: int = 20,
-                               title: str = None,
-                               xlabel: str = None,
-                               ylabel: str = None,
-                               features_names: Optional[List[str]] = None):
+def plot_features_distribution(
+    representation: dataset.Representation,
+    n_bins: int = 20,
+    title: str = None,
+    xlabel: str = None,
+    ylabel: str = None,
+    features_names: Optional[List[str]] = None,
+):
     """
     Affiche les histogrammes de distribution de chaque classe pour chaque
     caractéristique dans la représentation.
@@ -788,15 +900,26 @@ def plot_features_distribution(representation: dataset.Representation,
     if features_names is None:
         features_names = [f"Feature {i}" for i in range(n_features)]
 
-    fig, axes = _create_subplot_grid(n_features, figsize_per_plot=DEFAULT_FIGSIZE, title=title)
+    fig, axes = _create_subplot_grid(
+        n_features, figsize_per_plot=DEFAULT_FIGSIZE, title=title
+    )
 
     for ax, i in zip(axes, range(n_features)):
         for j, label in enumerate(representation.unique_labels):
             data = representation.get_class(label)
 
-            histogram, _ = numpy.histogram(data[:, i], bins=bin_edges, range=(features_min, features_max))
+            histogram, _ = numpy.histogram(
+                data[:, i], bins=bin_edges, range=(features_min, features_max)
+            )
 
-            ax.bar(bin_centers, histogram, width=bin_widths, alpha=0.5, label=label, color=colors[j])
+            ax.bar(
+                bin_centers,
+                histogram,
+                width=bin_widths,
+                alpha=0.5,
+                label=label,
+                color=colors[j],
+            )
 
         if xlabel:
             ax.set_xlabel(xlabel)

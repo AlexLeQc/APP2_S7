@@ -125,21 +125,18 @@ class BayesClassifier(Classifier):
         """
         class_probabilities = []
         for density in self.densities:
-            probability = density.compute_probability(
-                data
-            )  # P(x|C_i) for all x in the dataset
+            probability = density.compute_probability(data)
             class_probabilities.append(probability)
         class_probabilities = numpy.array(class_probabilities)
 
-        # Minimize the risk
-        # L3.E3.2 Compléter cette fonction pour déployer le classificateur en assumant des classe équiprobables à coût unitaire
-        # L3.S1 Modifier cette partie pour prendre en compte la matrice de coût et des classes non équiprobables
         # ---------------------------------------------------------------------
-        risks = numpy.zeros((data.shape[0], len(self.densities)))
+        likelihoods = class_probabilities.T
 
-        # Ici, argmax de la probabilité assume des coûts unitaires et des aprioris égaux
-        # Dans le cadre de la problématique on cherche à minimiser le risque
-        predictions = numpy.argmax(class_probabilities.T, axis=1)
+        posteriors = likelihoods * self.aprioris
+
+        risks = numpy.dot(posteriors, self.cost_matrix.T)
+
+        predictions = numpy.argmin(risks, axis=1)
         # ---------------------------------------------------------------------
 
         return predictions
@@ -200,17 +197,18 @@ class KNNClassifier(Classifier):
         self.use_kmeans = use_kmeans
         self.n_representatives = n_representatives
 
+        self.metric = metric
         if use_kmeans:
-            # L3.E2.3 Compléter l'utilisation de KMeans
-            # à partir des arguments fournis au constructeur de KNNClassifier
             # -----------------------------------------------------------------
-            self.kmeans = sklearn.cluster.KMeans(1, n_init="auto")
+            self.kmeans = sklearn.cluster.KMeans(
+                n_clusters=self.n_representatives, n_init="auto"
+            )
             # -----------------------------------------------------------------
 
-        # L3.E2.1 Complétez l'utilisation de KNeighborsClassifier
-        # à partire des arguments fournis au constructeur de KNNClassifier
         # ---------------------------------------------------------------------
-        self.knn = sklearn.neighbors.KNeighborsClassifier(1)
+        self.knn = sklearn.neighbors.KNeighborsClassifier(
+            n_neighbors=self.n_neighbors, metric=self.metric
+        )
         # ---------------------------------------------------------------------
 
     def fit(self, representation: dataset.Representation):
@@ -303,6 +301,7 @@ class NeuralNetworkClassifier(Classifier):
         lr: float = 0.01,
         n_epochs: int = 1000,
         batch_size: int = 16,
+        activation: str = "relu",
     ):
         """
         Args:
@@ -313,6 +312,7 @@ class NeuralNetworkClassifier(Classifier):
             lr: Taux d'apprentissage pour l'optimiseur.
             n_epochs: Nombre d'époques pour l'entraînement.
             batch_size: Taille des lots pour l'entraînement.
+            activation: Fonction d'activation à utiliser pour les couches cachées.
         """
         self.n_hidden = n_hidden
         self.n_neurons = n_neurons
@@ -320,6 +320,7 @@ class NeuralNetworkClassifier(Classifier):
         self.lr = lr
         self.n_epochs = n_epochs
         self.batch_size = batch_size
+        self.activation = activation
 
         self.history = None
 
@@ -332,7 +333,9 @@ class NeuralNetworkClassifier(Classifier):
         self.model = keras.models.Sequential()
         self.model.add(keras.layers.InputLayer(shape=(input_dim,)))
         for _ in range(self.n_hidden - 1):
-            self.model.add(keras.layers.Dense(units=self.n_neurons, activation="tanh"))
+            self.model.add(
+                keras.layers.Dense(units=self.n_neurons, activation=self.activation)
+            )
         self.model.add(keras.layers.Dense(units=output_dim, activation="softmax"))
         # -------------------------------------------------------------------------
 
@@ -381,23 +384,15 @@ class NeuralNetworkClassifier(Classifier):
         # L2.E4.1 Convertissez les étiquettes de classe en un format qui permet d'utiliser une loss plus approprié que MSE
         # pour l'entraînement d'un classificateur.
         # -------------------------------------------------------------------------
-        encoder = sklearn.preprocessing.LabelEncoder()
-        integer_labels = encoder.fit_transform(representation.labels)
-        one_hot_labels = numpy.zeros(
-            (len(integer_labels), len(representation.unique_labels))
-        )
-        one_hot_labels[numpy.arange(len(integer_labels)), integer_labels] = 1.0
+        encoder = sklearn.preprocessing.OneHotEncoder(sparse_output=False)
+        labels_2d = representation.labels.reshape(-1, 1)
+        labels_one_hot = encoder.fit_transform(labels_2d)
         # -------------------------------------------------------------------------
 
-        # L2.E4.2 Partitionnez les données en sous-ensemble d'entraînement et de validation.
         # -------------------------------------------------------------------------
         train_data, val_data, train_labels, val_labels = (
             sklearn.model_selection.train_test_split(
-                representation.data,
-                one_hot_labels,
-                test_size=0.2,
-                random_state=42,
-                stratify=integer_labels,
+                representation.data, labels_one_hot, test_size=0.25, random_state=42
             )
         )
         # -------------------------------------------------------------------------
@@ -436,7 +431,7 @@ class NeuralNetworkClassifier(Classifier):
             batch_size=self.batch_size,
             epochs=self.n_epochs,
             callbacks=callbacks,
-            verbose=False,
+            verbose=True,
         )
         # -------------------------------------------------------------------------
 
@@ -523,20 +518,14 @@ class PrintEveryNEpochs(keras.callbacks.Callback):
         # L2.E2.4 Visualiser la performance de l'entraînement d'une manière plus ergonomique
         # que l'affichage par défaut, par exemple à chaque multiple de n_epochs.
         if (epoch + 1) % self.n_epochs == 0:
-            loss = logs.get("loss", float("nan"))
-            val_loss = logs.get("val_loss", None)
-            accuracy = logs.get("accuracy", None)
-            val_accuracy = logs.get("val_accuracy", None)
+            loss = logs["loss"]
+            val_loss = logs.get("val_loss", 0.0)
+            accuracy = logs.get("accuracy", 0.0)
+            val_accuracy = logs.get("val_accuracy", 0.0)
 
-            msg = f"Epoch {epoch + 1:>4}: loss = {loss:.4f}"
-            if val_loss is not None:
-                msg += f", val_loss = {val_loss:.4f}"
-            if accuracy is not None:
-                msg += f", accuracy = {accuracy:.4f}"
-            if val_accuracy is not None:
-                msg += f", val_accuracy = {val_accuracy:.4f}"
-
-            print(msg)
+            print(
+                f"Epoch {epoch + 1:>3}: loss = {loss:.4f}, val_loss = {val_loss:.4f}, accuracy = {accuracy:.4f}, val_accuracy = {val_accuracy:.4f}"
+            )
 
 
 def set_deterministic(seed: int = 0):
