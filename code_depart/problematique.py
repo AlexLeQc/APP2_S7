@@ -46,6 +46,30 @@ def extract_ratio_vh(image: numpy.ndarray) -> float:
     return float(vertical_edges / (horizontal_edges + 1e-8))
 
 
+def compute_permutation_importance(
+    clf, X, y, unique_labels, n_repeats=30, random_state=42
+):
+    """Permutation importance pour un classificateur qui retourne des indices de classe."""
+    rng = numpy.random.default_rng(random_state)
+
+    def score(X_eval):
+        indices = clf.predict(X_eval)
+        preds = numpy.array([unique_labels[i] for i in indices])
+        return numpy.mean(preds == y)
+
+    baseline = score(X)
+    n_features = X.shape[1]
+    importances = numpy.zeros((n_features, n_repeats))
+
+    for j in range(n_features):
+        for r in range(n_repeats):
+            X_perm = X.copy()
+            X_perm[:, j] = rng.permutation(X_perm[:, j])
+            importances[j, r] = baseline - score(X_perm)
+
+    return importances.mean(axis=1), importances.std(axis=1)
+
+
 def problematique():
     images = dataset.ImageDataset("data/image_dataset/")
 
@@ -125,7 +149,6 @@ def problematique():
         xlabel="PC 1",
         ylabel="PC 2",
         zlabel="PC 3",
-        show_ellipses=True,
     )
 
     # -------------------------------------------------------------------------
@@ -171,12 +194,49 @@ def problematique():
         title="Matrice de confusion - Bayes Gaussien",
     )
 
+    # Permutation importance dans l'espace des 4 features originales (standardisées)
+    # (pas en espace PCA, pour garder l'interprétabilité des features initiales)
+    train_feat_orig, test_feat_orig, train_labels_orig, test_labels_orig = (
+        train_test_split(
+            features_scaled,
+            images.labels,
+            test_size=0.2,
+            random_state=42,
+            stratify=images.labels,
+        )
+    )
+    train_repr_orig = dataset.Representation(
+        data=train_feat_orig, labels=train_labels_orig
+    )
+
+    bayes_gauss_orig = classifier.BayesClassifier(
+        aprioris=numpy.array([1 / n_classes] * n_classes),
+        cost_matrix=cost_matrix,
+        density_function=analysis.GaussianPDF,
+    )
+    bayes_gauss_orig.fit(train_repr_orig)
+
+    imp_mean, imp_std = compute_permutation_importance(
+        bayes_gauss_orig,
+        test_feat_orig,
+        test_labels_orig,
+        train_repr_orig.unique_labels,
+        n_repeats=30,
+        random_state=42,
+    )
+
+    print("\n--- Importance des caractéristiques (Bayes Gaussien, espace original) ---")
+    for i, name in enumerate(feature_names):
+        print(f"{name:<15}: {imp_mean[i]:.4f} +/- {imp_std[i]:.4f}")
     # -------------------------------------------------------------------------
     # 1b. CLASSIFICATEUR BAYÉSIEN - PDF Arbitraire (Histogramme)
     # -------------------------------------------------------------------------
     print("\n========== 1b. Classificateur Bayésien (Histogramme) ==========")
 
     print("\n--- Recherche du meilleur n_bins pour HistogramPDF ---")
+    best_n_bins = None
+    best_error = float("inf")
+
     for n_bins_test in [3, 4, 5, 6, 8, 10]:
         bayes_test = classifier.BayesClassifier(
             aprioris=aprioris,
@@ -191,11 +251,16 @@ def problematique():
         err_test, _ = analysis.compute_error_rate(test_labels, pred_test_labels)
         print(f"  n_bins={n_bins_test}: taux d'erreur = {err_test * 100:.2f}%")
 
-    # Utiliser le meilleur n_bins trouvé
+        if err_test < best_error:
+            best_error = err_test
+            best_n_bins = n_bins_test
+
+    print(f"Meilleur n_bins trouvé : {best_n_bins}")
+
     bayes_hist = classifier.BayesClassifier(
         aprioris=aprioris,
         cost_matrix=cost_matrix,
-        density_function=lambda data: analysis.HistogramPDF(data, n_bins=5),
+        density_function=lambda data: analysis.HistogramPDF(data, n_bins=best_n_bins),
     )
     bayes_hist.fit(train_repr)
     pred_bayes_hist = bayes_hist.predict(test_data)
