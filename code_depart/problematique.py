@@ -9,6 +9,8 @@ import sklearn.decomposition
 import sklearn.preprocessing
 from helpers import analysis, classifier, viz
 from matplotlib import pyplot as plt
+from sklearn.metrics import f1_score, precision_score, recall_score
+from sklearn.model_selection import train_test_split
 
 
 def extract_std_rgb(img_normalized: numpy.ndarray) -> numpy.ndarray:
@@ -32,6 +34,14 @@ def extract_lab_b_peaks(image: numpy.ndarray) -> float:
     return float(len(peaks_b))
 
 
+def extract_lab_a_peaks(image: numpy.ndarray) -> float:
+    """Calcule le nombre de pics dans le canal a de l'espace Lab"""
+    image_lab = skimage.color.rgb2lab(image / 255.0)
+    scaled_lab = analysis.rescale_lab(image_lab, n_bins=256)
+    peaks_a, _ = scipy.signal.find_peaks(scaled_lab[:, :, 1].flatten())
+    return float(len(peaks_a))
+
+
 def extract_std_red(image: numpy.ndarray) -> float:
     """Calcule l'écart-type pour le canal Rouge uniquement"""
     return float(numpy.std(image[:, :, 0]))
@@ -46,8 +56,44 @@ def extract_ratio_vh(image: numpy.ndarray) -> float:
     return float(vertical_edges / (horizontal_edges + 1e-8))
 
 
+def extract_blue_top_bottom_ratio(image: numpy.ndarray) -> float:
+    """Calcule le ratio d'intensité du canal Bleu entre le haut et le bas de l'image"""
+    h = image.shape[0]
+    top_half = image[: h // 2, :, 2]
+    bottom_half = image[h // 2 :, :, 2]
+
+    mean_blue_top = numpy.mean(top_half)
+    mean_blue_bottom = numpy.mean(bottom_half)
+
+    return float(mean_blue_top / (mean_blue_bottom + 1e-8))
+
+
+def extract_mean_saturation_hsv(image: numpy.ndarray) -> float:
+    """Calcule la saturation moyenne (espace HSV"""
+    image_hsv = skimage.color.rgb2hsv(image / 255.0)
+    return float(numpy.mean(image_hsv[:, :, 1]))
+
+
+def extract_mean_luminance_lab(image: numpy.ndarray) -> float:
+    """Calcule la luminance moyenne (canal L*)"""
+    image_lab = skimage.color.rgb2lab(image / 255.0)
+    return float(numpy.mean(image_lab[:, :, 0]))
+
+
+def extract_mean_a_lab(image: numpy.ndarray) -> float:
+    """Calcule la moyenne de l'axe Vert-Rouge (canal a*)"""
+    image_lab = skimage.color.rgb2lab(image / 255.0)
+    return float(numpy.mean(image_lab[:, :, 1]))
+
+
+def extract_mean_b_lab(image: numpy.ndarray) -> float:
+    """Calcule la moyenne de l'axe Bleu-Jaune (canal b*)"""
+    image_lab = skimage.color.rgb2lab(image / 255.0)
+    return float(numpy.mean(image_lab[:, :, 2]))
+
+
 def compute_permutation_importance(
-    clf, X, y, unique_labels, n_repeats=30, random_state=42
+    clf, X, y, unique_labels, n_repeats=30, random_state=None
 ):
     """Permutation importance pour un classificateur qui retourne des indices de classe."""
     rng = numpy.random.default_rng(random_state)
@@ -81,16 +127,46 @@ def problematique():
     for image, label in images:
         noise_level = extract_noise_fft(image)
         lab_b_peaks = extract_lab_b_peaks(image)
+        # lab_a_peaks = extract_lab_a_peaks(image)
         std_red = extract_std_red(image)
         ratio_vh = extract_ratio_vh(image)
-        features_list.append([noise_level, lab_b_peaks, std_red, ratio_vh])
+        # blue_ratio = extract_blue_top_bottom_ratio(image)
+        # mean_sat = extract_mean_saturation_hsv(image)
+        # mean_lum = extract_mean_luminance_lab(image)
+        # mean_a = extract_mean_a_lab(image)
+        # mean_b = extract_mean_b_lab(image)
+        features_list.append(
+            [
+                noise_level,
+                lab_b_peaks,
+                # lab_a_peaks,
+                std_red,
+                ratio_vh,
+                # blue_ratio,
+                # mean_sat,
+                # mean_lum,
+                # mean_a,
+                # mean_b,
+            ]
+        )
 
     features = numpy.array(features_list, dtype=numpy.float32)
 
     # -------------------------------------------------------------------------
     # VISUALISATION DE LA REPRÉSENTATION BRUTE
     # -------------------------------------------------------------------------
-    feature_names = ["Bruit FFT", "Pics Lab(b)", "Écart-type R", "Ratio V/H"]
+    feature_names = [
+        "Bruit FFT",
+        "Pics Lab(b)",
+        # "Pics Lab(a)",
+        "Écart-type R",
+        "Ratio V/H",
+        # "Ratio Bleu Haut/Bas",
+        "Saturation HSV",
+        # "Luminance Lab",
+        # "A* Lab",
+        # "B* Lab",
+    ]
 
     scaler = sklearn.preprocessing.StandardScaler()
     features_scaled = scaler.fit_transform(features)
@@ -153,15 +229,15 @@ def problematique():
 
     # -------------------------------------------------------------------------
     # SÉPARATION ENTRAÎNEMENT / TEST
+    # On entraîne sur les 8 features standardisées (pas l'espace PCA qui ne sert qu'au plot)
     # -------------------------------------------------------------------------
-    from sklearn.model_selection import train_test_split
 
     train_data, test_data, train_labels, test_labels = train_test_split(
-        representation_pca.data,
-        representation_pca.labels,
+        features_scaled,
+        images.labels,
         test_size=0.2,
-        random_state=42,
-        stratify=representation_pca.labels,
+        random_state=None,
+        stratify=images.labels,
     )
     train_repr = dataset.Representation(data=train_data, labels=train_labels)
 
@@ -194,38 +270,17 @@ def problematique():
         title="Matrice de confusion - Bayes Gaussien",
     )
 
-    # Permutation importance dans l'espace des 4 features originales (standardisées)
-    # (pas en espace PCA, pour garder l'interprétabilité des features initiales)
-    train_feat_orig, test_feat_orig, train_labels_orig, test_labels_orig = (
-        train_test_split(
-            features_scaled,
-            images.labels,
-            test_size=0.2,
-            random_state=42,
-            stratify=images.labels,
-        )
-    )
-    train_repr_orig = dataset.Representation(
-        data=train_feat_orig, labels=train_labels_orig
-    )
-
-    bayes_gauss_orig = classifier.BayesClassifier(
-        aprioris=numpy.array([1 / n_classes] * n_classes),
-        cost_matrix=cost_matrix,
-        density_function=analysis.GaussianPDF,
-    )
-    bayes_gauss_orig.fit(train_repr_orig)
-
+    # Permutation importance — bayes_gauss est déjà entraîné sur les 8 features standardisées
     imp_mean, imp_std = compute_permutation_importance(
-        bayes_gauss_orig,
-        test_feat_orig,
-        test_labels_orig,
-        train_repr_orig.unique_labels,
+        bayes_gauss,
+        test_data,
+        test_labels,
+        train_repr.unique_labels,
         n_repeats=30,
         random_state=42,
     )
 
-    print("\n--- Importance des caractéristiques (Bayes Gaussien, espace original) ---")
+    print("\n--- Importance des caractéristiques (Bayes Gaussien) ---")
     for i, name in enumerate(feature_names):
         print(f"{name:<15}: {imp_mean[i]:.4f} +/- {imp_std[i]:.4f}")
     # -------------------------------------------------------------------------
@@ -237,7 +292,7 @@ def problematique():
     best_n_bins = None
     best_error = float("inf")
 
-    for n_bins_test in [3, 4, 5, 6, 8, 10]:
+    for n_bins_test in [1, 2, 3, 4, 5, 6, 8, 10]:
         bayes_test = classifier.BayesClassifier(
             aprioris=aprioris,
             cost_matrix=cost_matrix,
@@ -281,24 +336,8 @@ def problematique():
     # 2. CLASSIFICATEUR K-PPV (KNN)
     # -------------------------------------------------------------------------
     print("\n\n========== 2. Classificateur K-PPV ==========")
-
-    # 2a. KNN sans k-moyennes, k=5
-    print("\n2a. KNN (k=5, sans k-moyennes)")
-    knn = classifier.KNNClassifier(n_neighbors=5, use_kmeans=False)
-    knn.fit(train_repr)
-    pred_knn = knn.predict(test_data)
-    err_knn, _ = analysis.compute_error_rate(test_labels, pred_knn)
-    print(f"Taux d'erreur K-PPV (k=5) : {err_knn * 100:.2f}%")
-    viz.show_confusion_matrix(
-        test_labels,
-        pred_knn,
-        train_repr.unique_labels,
-        plot=True,
-        title="Matrice de confusion - KNN k=5",
-    )
-
-    # 2b. KNN avec k-moyennes (quantification vectorielle)
-    print("\n2b. KNN (k=1, avec k-moyennes, 5 représentants/classe)")
+    # KNN avec k-moyennes (quantification vectorielle)
+    print("\nKNN (k=1, avec k-moyennes, 5 représentants/classe)")
     knn_kmeans = classifier.KNNClassifier(
         n_neighbors=1, use_kmeans=True, n_representatives=5
     )
@@ -325,7 +364,7 @@ def problematique():
         n_hidden=3,
         n_neurons=8,
         lr=0.005,
-        n_epochs=100,
+        n_epochs=40,
         batch_size=32,
     )
     rna.fit(train_repr)
@@ -357,7 +396,6 @@ def problematique():
     results = [
         ("Bayes Gaussien", err_bayes),
         ("Bayes Histogramme", err_bayes_hist),
-        ("KNN k=5", err_knn),
         ("KNN k-moyennes (5 rep)", err_knn_kmeans),
         ("RNA (3 couches, 16 neu)", err_rna),
     ]
@@ -366,13 +404,9 @@ def problematique():
         accuracy = (1 - err) * 100
         print(f"{name:<35} {err * 100:>14.2f}%  {accuracy:>10.2f}%")
 
-    # Calcul F1-score (macro) pour chaque classificateur via sklearn
-    from sklearn.metrics import f1_score, precision_score, recall_score
-
     all_preds = [
         ("Bayes Gaussien", pred_bayes_labels),
         ("Bayes Histogramme", pred_bayes_hist_labels),
-        ("KNN k=5", pred_knn),
         ("KNN k-moyennes", pred_knn_kmeans),
         ("RNA", pred_rna_labels),
     ]
