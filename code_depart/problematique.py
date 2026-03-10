@@ -93,7 +93,7 @@ def extract_mean_b_lab(image: numpy.ndarray) -> float:
 
 
 def compute_permutation_importance(
-    clf, X, y, unique_labels, n_repeats=30, random_state=None
+    clf, X, y, unique_labels, n_repeats=30, random_state=42
 ):
     """Permutation importance pour un classificateur qui retourne des indices de classe."""
     rng = numpy.random.default_rng(random_state)
@@ -162,7 +162,7 @@ def problematique():
         "Écart-type R",
         "Ratio V/H",
         # "Ratio Bleu Haut/Bas",
-        "Saturation HSV",
+        # "Saturation HSV",
         # "Luminance Lab",
         # "A* Lab",
         # "B* Lab",
@@ -229,14 +229,13 @@ def problematique():
 
     # -------------------------------------------------------------------------
     # SÉPARATION ENTRAÎNEMENT / TEST
-    # On entraîne sur les 8 features standardisées (pas l'espace PCA qui ne sert qu'au plot)
     # -------------------------------------------------------------------------
 
     train_data, test_data, train_labels, test_labels = train_test_split(
-        features_scaled,
+        features_pca,
         images.labels,
         test_size=0.2,
-        random_state=None,
+        random_state=42,
         stratify=images.labels,
     )
     train_repr = dataset.Representation(data=train_data, labels=train_labels)
@@ -250,8 +249,7 @@ def problematique():
 
     aprioris = numpy.array([1 / n_classes] * n_classes)
 
-    cost_matrix = numpy.ones((n_classes, n_classes)) - numpy.eye(n_classes)
-
+    cost_matrix = numpy.array([[0, 1, 1], [1, 0, 1], [1, 1, 0]])
     bayes_gauss = classifier.BayesClassifier(
         aprioris=aprioris,
         cost_matrix=cost_matrix,
@@ -270,7 +268,8 @@ def problematique():
         title="Matrice de confusion - Bayes Gaussien",
     )
 
-    # Permutation importance — bayes_gauss est déjà entraîné sur les 8 features standardisées
+    # Permutation importance — bayes_gauss entraîné sur les composantes PCA
+    pca_names = [f"PC {i + 1}" for i in range(features_pca.shape[1])]
     imp_mean, imp_std = compute_permutation_importance(
         bayes_gauss,
         test_data,
@@ -280,57 +279,57 @@ def problematique():
         random_state=42,
     )
 
-    print("\n--- Importance des caractéristiques (Bayes Gaussien) ---")
-    for i, name in enumerate(feature_names):
-        print(f"{name:<15}: {imp_mean[i]:.4f} +/- {imp_std[i]:.4f}")
-    # -------------------------------------------------------------------------
-    # 1b. CLASSIFICATEUR BAYÉSIEN - PDF Arbitraire (Histogramme)
-    # -------------------------------------------------------------------------
-    print("\n========== 1b. Classificateur Bayésien (Histogramme) ==========")
+    print("\n--- Importance des composantes PCA (Bayes Gaussien) ---")
+    for i, name in enumerate(pca_names):
+        print(f"{name:<8}: {imp_mean[i]:.4f} +/- {imp_std[i]:.4f}")
+    # # -------------------------------------------------------------------------
+    # # 1b. CLASSIFICATEUR BAYÉSIEN - PDF Arbitraire (Histogramme)
+    # # -------------------------------------------------------------------------
+    # print("\n========== 1b. Classificateur Bayésien (Histogramme) ==========")
 
-    print("\n--- Recherche du meilleur n_bins pour HistogramPDF ---")
-    best_n_bins = None
-    best_error = float("inf")
+    # print("\n--- Recherche du meilleur n_bins pour HistogramPDF ---")
+    # best_n_bins = None
+    # best_error = float("inf")
 
-    for n_bins_test in [1, 2, 3, 4, 5, 6, 8, 10]:
-        bayes_test = classifier.BayesClassifier(
-            aprioris=aprioris,
-            cost_matrix=cost_matrix,
-            density_function=lambda data, nb=n_bins_test: analysis.HistogramPDF(
-                data, n_bins=nb
-            ),
-        )
-        bayes_test.fit(train_repr)
-        pred_test = bayes_test.predict(test_data)
-        pred_test_labels = numpy.array([train_repr.unique_labels[p] for p in pred_test])
-        err_test, _ = analysis.compute_error_rate(test_labels, pred_test_labels)
-        print(f"  n_bins={n_bins_test}: taux d'erreur = {err_test * 100:.2f}%")
+    # for n_bins_test in [1, 2, 3, 4]:
+    #     bayes_test = classifier.BayesClassifier(
+    #         aprioris=aprioris,
+    #         cost_matrix=cost_matrix,
+    #         density_function=lambda data, nb=n_bins_test: analysis.HistogramPDF(
+    #             data, n_bins=nb
+    #         ),
+    #     )
+    #     bayes_test.fit(train_repr)
+    #     pred_test = bayes_test.predict(test_data)
+    #     pred_test_labels = numpy.array([train_repr.unique_labels[p] for p in pred_test])
+    #     err_test, _ = analysis.compute_error_rate(test_labels, pred_test_labels)
+    #     print(f"  n_bins={n_bins_test}: taux d'erreur = {err_test * 100:.2f}%")
 
-        if err_test < best_error:
-            best_error = err_test
-            best_n_bins = n_bins_test
+    #     if err_test < best_error:
+    #         best_error = err_test
+    #         best_n_bins = n_bins_test
 
-    print(f"Meilleur n_bins trouvé : {best_n_bins}")
+    # print(f"Meilleur n_bins trouvé : {best_n_bins}")
 
-    bayes_hist = classifier.BayesClassifier(
-        aprioris=aprioris,
-        cost_matrix=cost_matrix,
-        density_function=lambda data: analysis.HistogramPDF(data, n_bins=best_n_bins),
-    )
-    bayes_hist.fit(train_repr)
-    pred_bayes_hist = bayes_hist.predict(test_data)
-    pred_bayes_hist_labels = numpy.array(
-        [train_repr.unique_labels[p] for p in pred_bayes_hist]
-    )
-    err_bayes_hist, _ = analysis.compute_error_rate(test_labels, pred_bayes_hist_labels)
-    print(f"Taux d'erreur Bayésien (Histogramme) : {err_bayes_hist * 100:.2f}%")
-    viz.show_confusion_matrix(
-        test_labels,
-        pred_bayes_hist_labels,
-        train_repr.unique_labels,
-        plot=True,
-        title="Matrice de confusion - Bayes Histogramme",
-    )
+    # bayes_hist = classifier.BayesClassifier(
+    #     aprioris=aprioris,
+    #     cost_matrix=cost_matrix,
+    #     density_function=lambda data: analysis.HistogramPDF(data, n_bins=best_n_bins),
+    # )
+    # bayes_hist.fit(train_repr)
+    # pred_bayes_hist = bayes_hist.predict(test_data)
+    # pred_bayes_hist_labels = numpy.array(
+    #     [train_repr.unique_labels[p] for p in pred_bayes_hist]
+    # )
+    # err_bayes_hist, _ = analysis.compute_error_rate(test_labels, pred_bayes_hist_labels)
+    # print(f"Taux d'erreur Bayésien (Histogramme) : {err_bayes_hist * 100:.2f}%")
+    # viz.show_confusion_matrix(
+    #     test_labels,
+    #     pred_bayes_hist_labels,
+    #     train_repr.unique_labels,
+    #     plot=True,
+    #     title="Matrice de confusion - Bayes Histogramme",
+    # )
 
     # -------------------------------------------------------------------------
     # 2. CLASSIFICATEUR K-PPV (KNN)
@@ -395,7 +394,6 @@ def problematique():
 
     results = [
         ("Bayes Gaussien", err_bayes),
-        ("Bayes Histogramme", err_bayes_hist),
         ("KNN k-moyennes (5 rep)", err_knn_kmeans),
         ("RNA (3 couches, 16 neu)", err_rna),
     ]
@@ -406,7 +404,6 @@ def problematique():
 
     all_preds = [
         ("Bayes Gaussien", pred_bayes_labels),
-        ("Bayes Histogramme", pred_bayes_hist_labels),
         ("KNN k-moyennes", pred_knn_kmeans),
         ("RNA", pred_rna_labels),
     ]
