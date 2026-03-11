@@ -1,16 +1,17 @@
 import pathlib
 
-import helpers.dataset as dataset
 import numpy
 import scipy.signal
 import skimage
 import sklearn
 import sklearn.decomposition
 import sklearn.preprocessing
-from helpers import analysis, classifier, viz
 from matplotlib import pyplot as plt
 from sklearn.metrics import f1_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
+
+import helpers.dataset as dataset
+from helpers import analysis, classifier, viz
 
 
 def extract_std_rgb(img_normalized: numpy.ndarray) -> numpy.ndarray:
@@ -93,7 +94,7 @@ def extract_mean_b_lab(image: numpy.ndarray) -> float:
 
 
 def compute_permutation_importance(
-    clf, X, y, unique_labels, n_repeats=30, random_state=42
+    clf, X, y, unique_labels, n_repeats=30, random_state=69
 ):
     """Permutation importance pour un classificateur qui retourne des indices de classe."""
     rng = numpy.random.default_rng(random_state)
@@ -194,16 +195,13 @@ def problematique():
     # -------------------------------------------------------------------------
     # PCA - Décorrélation et réduction de dimensionnalité
     # -------------------------------------------------------------------------
-    # On utilise les vecteurs propres globaux (sur toutes les données) comme au labo 1
     mean_global, cov_global, eigvals_global, eigvecs_global = (
         analysis.compute_gaussian_model(features_scaled)
     )
     print("\n--- Modèle gaussien global (pour PCA manuelle) ---")
     viz.print_gaussian_model(mean_global, cov_global, eigvals_global, eigvecs_global)
 
-    # Variance expliquée par composante
     total_variance = numpy.sum(eigvals_global)
-    # Les valeurs propres de eigh sont en ordre croissant, on les inverse
     eigvals_sorted = eigvals_global[::-1]
     explained_variance_ratio = eigvals_sorted / total_variance
     print("\n--- Variance expliquée par composante principale ---")
@@ -235,7 +233,7 @@ def problematique():
         features_pca,
         images.labels,
         test_size=0.2,
-        random_state=42,
+        random_state=69,
         stratify=images.labels,
     )
     train_repr = dataset.Representation(data=train_data, labels=train_labels)
@@ -268,7 +266,6 @@ def problematique():
         title="Matrice de confusion - Bayes Gaussien",
     )
 
-    # Permutation importance — bayes_gauss entraîné sur les composantes PCA
     pca_names = [f"PC {i + 1}" for i in range(features_pca.shape[1])]
     imp_mean, imp_std = compute_permutation_importance(
         bayes_gauss,
@@ -276,69 +273,45 @@ def problematique():
         test_labels,
         train_repr.unique_labels,
         n_repeats=30,
-        random_state=42,
+        random_state=69,
     )
 
     print("\n--- Importance des composantes PCA (Bayes Gaussien) ---")
     for i, name in enumerate(pca_names):
         print(f"{name:<8}: {imp_mean[i]:.4f} +/- {imp_std[i]:.4f}")
-    # # -------------------------------------------------------------------------
-    # # 1b. CLASSIFICATEUR BAYÉSIEN - PDF Arbitraire (Histogramme)
-    # # -------------------------------------------------------------------------
-    # print("\n========== 1b. Classificateur Bayésien (Histogramme) ==========")
 
-    # print("\n--- Recherche du meilleur n_bins pour HistogramPDF ---")
-    # best_n_bins = None
-    # best_error = float("inf")
+    # -------------------------------------------------------------------------
+    # 1.b CLASSIFICATEUR BAYÉSIEN - Modèle Histogramme
+    # -------------------------------------------------------------------------
 
-    # for n_bins_test in [1, 2, 3, 4]:
-    #     bayes_test = classifier.BayesClassifier(
-    #         aprioris=aprioris,
-    #         cost_matrix=cost_matrix,
-    #         density_function=lambda data, nb=n_bins_test: analysis.HistogramPDF(
-    #             data, n_bins=nb
-    #         ),
-    #     )
-    #     bayes_test.fit(train_repr)
-    #     pred_test = bayes_test.predict(test_data)
-    #     pred_test_labels = numpy.array([train_repr.unique_labels[p] for p in pred_test])
-    #     err_test, _ = analysis.compute_error_rate(test_labels, pred_test_labels)
-    #     print(f"  n_bins={n_bins_test}: taux d'erreur = {err_test * 100:.2f}%")
-
-    #     if err_test < best_error:
-    #         best_error = err_test
-    #         best_n_bins = n_bins_test
-
-    # print(f"Meilleur n_bins trouvé : {best_n_bins}")
-
-    # bayes_hist = classifier.BayesClassifier(
-    #     aprioris=aprioris,
-    #     cost_matrix=cost_matrix,
-    #     density_function=lambda data: analysis.HistogramPDF(data, n_bins=best_n_bins),
-    # )
-    # bayes_hist.fit(train_repr)
-    # pred_bayes_hist = bayes_hist.predict(test_data)
-    # pred_bayes_hist_labels = numpy.array(
-    #     [train_repr.unique_labels[p] for p in pred_bayes_hist]
-    # )
-    # err_bayes_hist, _ = analysis.compute_error_rate(test_labels, pred_bayes_hist_labels)
-    # print(f"Taux d'erreur Bayésien (Histogramme) : {err_bayes_hist * 100:.2f}%")
-    # viz.show_confusion_matrix(
-    #     test_labels,
-    #     pred_bayes_hist_labels,
-    #     train_repr.unique_labels,
-    #     plot=True,
-    #     title="Matrice de confusion - Bayes Histogramme",
-    # )
+    print("\n========== 1b. Classificateur Bayésien (Histogramme) ==========")
+    bayes_hist = classifier.BayesClassifier(
+        aprioris=aprioris,
+        cost_matrix=cost_matrix,
+        density_function=lambda data: analysis.HistogramPDF(data, n_bins=4),
+    )
+    bayes_hist.fit(train_repr)
+    pred_bayes_hist = bayes_hist.predict(test_data)
+    pred_bayes_hist_labels = numpy.array(
+        [train_repr.unique_labels[p] for p in pred_bayes_hist]
+    )
+    err_bayes_hist, _ = analysis.compute_error_rate(test_labels, pred_bayes_hist_labels)
+    print(f"Taux d'erreur Bayésien (Histogramme) : {err_bayes_hist * 100:.2f}%")
+    viz.show_confusion_matrix(
+        test_labels,
+        pred_bayes_hist_labels,
+        train_repr.unique_labels,
+        plot=True,
+        title="Matrice de confusion - Bayes Histogramme",
+    )
 
     # -------------------------------------------------------------------------
     # 2. CLASSIFICATEUR K-PPV (KNN)
     # -------------------------------------------------------------------------
     print("\n\n========== 2. Classificateur K-PPV ==========")
-    # KNN avec k-moyennes (quantification vectorielle)
     print("\nKNN (k=1, avec k-moyennes, 5 représentants/classe)")
     knn_kmeans = classifier.KNNClassifier(
-        n_neighbors=1, use_kmeans=True, n_representatives=5
+        n_neighbors=1, use_kmeans=True, n_representatives=6
     )
     knn_kmeans.fit(train_repr)
     pred_knn_kmeans = knn_kmeans.predict(test_data)
@@ -361,14 +334,13 @@ def problematique():
         input_dim=train_repr.dim,
         output_dim=len(train_repr.unique_labels),
         n_hidden=3,
-        n_neurons=8,
+        n_neurons=6,
         lr=0.005,
         n_epochs=40,
         batch_size=32,
     )
     rna.fit(train_repr)
 
-    # Sauvegarde du modèle entraîné
     rna.save(pathlib.Path(__file__).parent / "saves/problematique_rna.keras")
 
     viz.plot_metric_history(rna.history)
@@ -395,7 +367,7 @@ def problematique():
     results = [
         ("Bayes Gaussien", err_bayes),
         ("KNN k-moyennes (5 rep)", err_knn_kmeans),
-        ("RNA (3 couches, 16 neu)", err_rna),
+        ("RNA", err_rna),
     ]
 
     for name, err in results:

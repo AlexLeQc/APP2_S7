@@ -420,7 +420,7 @@ class NeuralNetworkClassifier(Classifier):
         callbacks = [
             PrintEveryNEpochs(n_epochs=25),
             keras.callbacks.EarlyStopping(
-                monitor="val_loss", patience=50, restore_best_weights=True
+                monitor="val_loss", patience=10, restore_best_weights=True
             ),
         ]
 

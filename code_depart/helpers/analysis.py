@@ -26,10 +26,7 @@ def project_onto_new_basis(data: numpy.ndarray, basis: numpy.ndarray) -> numpy.n
 
     # L1.E2.5 Complétez cette fonction pour projeter les données sur une nouvelle base
     # -------------------------------------------------------------------------
-    # Il faut faire un produit matriciel
-    return numpy.dot(
-        data, basis
-    )  # Remplacez cette ligne par le code de projection réel
+    return numpy.dot(data, basis)
     # -------------------------------------------------------------------------
 
 
